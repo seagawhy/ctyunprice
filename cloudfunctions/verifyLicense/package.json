@@ -1,0 +1,1 @@
+{"name": "verifyLicense", "version": "1.0.0", "description": "注册码验证与统计云函数", "main": "index.js", "dependencies": {"wx-server-sdk": "~2.6.3"}}

@@ -1,0 +1,14 @@
+# Docker 部署排除文件
+node_modules/
+.git/
+*.tar
+cloudfunctions/
+js-sdk-temp/
+generate-codes.js
+license_codes.*
+server.ps1
+README.md
+使用说明.md
+天翼云报价单.xlsx
+卖云的云先生.jpg
+.codebuddy/

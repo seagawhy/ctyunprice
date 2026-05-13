@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天翼云报价单生成</title>
+    <style>
+        body { font-family: '微软雅黑', Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #1F4E79; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background: #1F4E79; color: white; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        tr.total { background: #D9E1F2; font-weight: bold; }
+        .money { text-align: right; }
+        .download-btn { display: block; width: 200px; margin: 30px auto; padding: 15px 30px; background: #1F4E79; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        .download-btn:hover { background: #2E75B6; }
+        .summary { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 天翼云产品报价单</h1>
+        <p style="text-align:center; color:#666;">报价日期：2026-04-14</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>序号</th>
+                    <th>产品名称</th>
+                    <th>规格配置</th>
+                    <th>数量</th>
+                    <th>月租单价</th>
+                    <th>年租单价</th>
+                    <th>三年单价</th>
+                    <th>月租合计</th>
+                    <th>年租合计</th>
+                    <th>三年合计</th>
+                </tr>
+            </thead>
+            <tbody id="quoteBody">
+            </tbody>
+        </table>
+        
+        <button class="download-btn" onclick="downloadExcel()">📥 下载 Excel 报价单</button>
+    </div>
+
+    <script src="js/exceljs.min.js"></script>
+    <script>
+        // 价格计算
+        // 云主机套餐价格（标准独享型，已包含40GB系统盘，年付8折，三年7.5折）
+        // 64核256G: 21000元/月（含40GB系统盘）
+        // 32核64G: 8616元/月（含40GB系统盘）
+        // 超高IO SSD: 1.2元/GB/月，年付8.5折，三年6折
+        // 通用SSD: 0.7元/GB/月，年付8.5折，三年6折
+        // 注：超出40GB的系统盘需额外计费
+        
+        function getECSBasedPrice(cpu, ram) {
+            // 标准独享型云主机套餐价格（已包含40GB系统盘）
+            const prices = {
+                '64_256': 21000,
+                '64_128': 17280,
+                '32_64': 8616,
+                '32_128': 10500,
+                '16_64': 5300,
+                '16_32': 4320,
+            };
+            const key = `${cpu}_${ram}`;
+            return prices[key] || (cpu * 46 + ram * 17);
+        }
+        
+        function calcDisk(type, size) {
+            if (type === '超高IO') return size * 1.2;
+            if (type === '通用SSD') return size * 0.7;
+            return size * 0.3;
+        }
+        
+        function calcDiskYearly(type, size) {
+            if (type === '超高IO') return size * 1.2 * 12 * 0.85;
+            if (type === '通用SSD') return size * 0.7 * 12 * 0.85;
+            return size * 0.3 * 12 * 0.85;
+        }
+        
+        function calcDiskThreeYear(type, size) {
+            if (type === '超高IO') return size * 1.2 * 36 * 0.6;
+            if (type === '通用SSD') return size * 0.7 * 36 * 0.6;
+            return size * 0.3 * 36 * 0.6;
+        }
+        
+        // 云主机套餐已包含40GB系统盘，超出部分需额外计费
+        const BASE_SYS_DISK = 40; 
+        
+        const configs = [
+            { name: '通用型s8.16xlarge.4', cpu: 64, ram: 256, sysType: '超高IO', sysSize: 900, dataType: '通用SSD', dataSize: 2048, qty: 5 },
+            { name: '通用型s8.16xlarge.4', cpu: 32, ram: 64, sysType: '超高IO', sysSize: 900, dataType: '通用SSD', dataSize: 2048, qty: 1 },
+            { name: '通用型s8.16xlarge.4', cpu: 32, ram: 64, sysType: '超高IO', sysSize: 500, dataType: '通用SSD', dataSize: 2048, qty: 1 },
+        ];
+        
+        let grandTotal = { monthly: 0, yearly: 0, threeYear: 0 };
+        
+        function renderTable() {
+            const tbody = document.getElementById('quoteBody');
+            let html = '';
+            
+            configs.forEach((cfg, i) => {
+                // 云主机套餐价格（已含40GB系统盘）
+                const ecsPrice = getECSBasedPrice(cfg.cpu, cfg.ram);
+                // 系统盘：套餐已含40GB，超出部分计费
+                const extraSysSize = Math.max(0, cfg.sysSize - BASE_SYS_DISK);
+                const sysMonthly = calcDisk(cfg.sysType, extraSysSize);
+                // 数据盘：全额计费
+                const dataMonthly = calcDisk(cfg.dataType, cfg.dataSize);
+                
+                const ecsYearly = ecsPrice * 12 * 0.8;
+                const ecsThree = ecsPrice * 36 * 0.75;
+                const sysYearly = calcDiskYearly(cfg.sysType, extraSysSize);
+                const sysThree = calcDiskThreeYear(cfg.sysType, extraSysSize);
+                const dataYearly = calcDiskYearly(cfg.dataType, cfg.dataSize);
+                const dataThree = calcDiskThreeYear(cfg.dataType, cfg.dataSize);
+                
+                const unitMonthly = ecsPrice + sysMonthly + dataMonthly;
+                const unitYearly = ecsYearly + sysYearly + dataYearly;
+                const unitThree = ecsThree + sysThree + dataThree;
+                const totalMonthly = unitMonthly * cfg.qty;
+                const totalYearly = unitYearly * cfg.qty;
+                const totalThree = unitThree * cfg.qty;
+                
+                grandTotal.monthly += totalMonthly;
+                grandTotal.yearly += totalYearly;
+                grandTotal.threeYear += totalThree;
+                
+                const spec = `CPU ${cfg.cpu}核 | 内存 ${cfg.ram}G | 系统盘 ${cfg.sysType} ${cfg.sysSize}G | 数据盘 ${cfg.dataType} ${cfg.dataSize}G`;
+                
+                html += `
+                    <tr>
+                        <td style="text-align:center">${i + 1}</td>
+                        <td>云主机套餐-${cfg.name}</td>
+                        <td>${spec}</td>
+                        <td style="text-align:center">${cfg.qty}</td>
+                        <td class="money">¥${unitMonthly.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">¥${unitYearly.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">¥${unitThree.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">¥${totalMonthly.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">¥${totalYearly.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
+                        <td class="money">¥${totalThree.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                <tr class="total">
+                    <td></td>
+                    <td colspan="3"><strong>合计</strong></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="money"><strong>¥${grandTotal.monthly.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</strong></td>
+                    <td class="money"><strong>¥${grandTotal.yearly.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</strong></td>
+                    <td class="money"><strong>¥${grandTotal.threeYear.toLocaleString('zh-CN', {minimumFractionDigits: 2})}</strong></td>
+                </tr>
+            `;
+            
+            tbody.innerHTML = html;
+        }
+        
+        async function downloadExcel() {
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('天翼云报价单');
+            
+            // 标题
+            sheet.mergeCells('A1:J1');
+            sheet.getCell('A1').value = '天翼云产品报价单';
+            sheet.getCell('A1').font = { name: '微软雅黑', bold: true, size: 16 };
+            sheet.getCell('A1').alignment = { horizontal: 'center' };
+            
+            sheet.mergeCells('A2:J2');
+            sheet.getCell('A2').value = '报价日期：2026-04-14';
+            sheet.getCell('A2').font = { name: '微软雅黑', size: 11 };
+            
+            // 表头
+            const headers = ['序号', '产品名称', '规格配置', '数量', '月租单价', '年租单价', '三年单价', '月租合计', '年租合计', '三年合计'];
+            headers.forEach((h, i) => {
+                const cell = sheet.getCell(4, i + 1);
+                cell.value = h;
+                cell.font = { name: '微软雅黑', bold: true, color: 'FFFFFF' };
+                cell.fill = { type: 'patternFill', patternType: 'solid', fgColor: { argb: 'FF1F4E79' } };
+                cell.alignment = { horizontal: 'center' };
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            });
+            
+            // 数据
+            let row = 5;
+            let grandTotal = { monthly: 0, yearly: 0, threeYear: 0 };
+            
+            configs.forEach((cfg, i) => {
+                // 云主机套餐价格（已含40GB系统盘）
+                const ecsPrice = getECSBasedPrice(cfg.cpu, cfg.ram);
+                // 系统盘：套餐已含40GB，超出部分计费
+                const extraSysSize = Math.max(0, cfg.sysSize - BASE_SYS_DISK);
+                const sysMonthly = calcDisk(cfg.sysType, extraSysSize);
+                // 数据盘：全额计费
+                const dataMonthly = calcDisk(cfg.dataType, cfg.dataSize);
+                
+                const ecsYearly = ecsPrice * 12 * 0.8;
+                const ecsThree = ecsPrice * 36 * 0.75;
+                const sysYearly = calcDiskYearly(cfg.sysType, extraSysSize);
+                const sysThree = calcDiskThreeYear(cfg.sysType, extraSysSize);
+                const dataYearly = calcDiskYearly(cfg.dataType, cfg.dataSize);
+                const dataThree = calcDiskThreeYear(cfg.dataType, cfg.dataSize);
+                
+                const unitMonthly = ecsPrice + sysMonthly + dataMonthly;
+                const unitYearly = ecsYearly + sysYearly + dataYearly;
+                const unitThree = ecsThree + sysThree + dataThree;
+                const totalMonthly = unitMonthly * cfg.qty;
+                const totalYearly = unitYearly * cfg.qty;
+                const totalThree = unitThree * cfg.qty;
+                
+                grandTotal.monthly += totalMonthly;
+                grandTotal.yearly += totalYearly;
+                grandTotal.threeYear += totalThree;
+                
+                const spec = `CPU ${cfg.cpu}核 | 内存 ${cfg.ram}G | 系统盘 ${cfg.sysType} ${cfg.sysSize}G | 数据盘 ${cfg.dataType} ${cfg.dataSize}G`;
+                
+                const data = [i + 1, `云主机套餐-${cfg.name}`, spec, cfg.qty, 
+                    unitMonthly, unitYearly, unitThree, totalMonthly, totalYearly, totalThree];
+                
+                data.forEach((val, col) => {
+                    const cell = sheet.getCell(row, col + 1);
+                    cell.value = val;
+                    cell.font = { name: '微软雅黑', size: 11 };
+                    cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                    if (col === 0 || col >= 3) {
+                        cell.alignment = { horizontal: 'center' };
+                    }
+                    if (col >= 4) {
+                        cell.numFmt = '¥#,##0.00';
+                    }
+                });
+                row++;
+            });
+            
+            // 合计行
+            const totalData = ['', '合计', '', '', '', '', '', grandTotal.monthly, grandTotal.yearly, grandTotal.threeYear];
+            totalData.forEach((val, col) => {
+                const cell = sheet.getCell(row, col + 1);
+                cell.value = val;
+                cell.font = { name: '微软雅黑', bold: true, size: 11 };
+                cell.fill = { type: 'patternFill', patternType: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                cell.alignment = { horizontal: col <= 3 ? 'center' : 'left' };
+                if (col >= 7) {
+                    cell.numFmt = '¥#,##0.00';
+                }
+            });
+            
+            // 列宽
+            sheet.columns = [
+                { width: 6 }, { width: 25 }, { width: 60 }, { width: 8 },
+                { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 14 }
+            ];
+            
+            // 下载
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '天翼云报价单_通用型s8.xlsx';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        renderTable();
+    </script>
+</body>
+</html>

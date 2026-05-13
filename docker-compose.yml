@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  ctyun-quote:
+    build: .
+    container_name: ctyun-quote-tool
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DEFAULT_LICENSE_CODE=20262026
+    networks:
+      - ctyun-net
+
+networks:
+  ctyun-net:
+    driver: bridge

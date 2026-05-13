@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>获取注册码 - 天翼云报价工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", -apple-system, sans-serif;
+            background: linear-gradient(135deg, #c41e3a 0%, #8b1538 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 420px;
+            padding: 36px 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+            text-align: center;
+        }
+
+        .icon { font-size: 48px; margin-bottom: 16px; }
+        
+        h1 {
+            font-size: 20px;
+            color: #2c2c2c;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 28px;
+            line-height: 1.6;
+        }
+
+        /* 注册码显示区 */
+        .code-box {
+            background: linear-gradient(135deg, #fff8f0 0%, #fff0e6 100%);
+            border: 2px dashed #d4af37;
+            border-radius: 14px;
+            padding: 22px 18px;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .code-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .code-value {
+            font-size: 26px;
+            font-weight: 800;
+            color: #c41e3a;
+            letter-spacing: 3px;
+            font-family: "Consolas", "Monaco", monospace;
+            word-break: break-all;
+        }
+
+        /* 按钮 */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 13px 28px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #c41e3a 0%, #8b1538 100%);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(196,30,58,0.35);
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(196,30,58,0.45); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-copy {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        .btn-copy:hover:not(:disabled) { background: #eee; }
+
+        .btn-link {
+            background: transparent;
+            color: var(--primary);
+            padding: 8px;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .btn-link:hover { text-decoration: underline; }
+
+        /* 提示信息 */
+        .tips {
+            margin-top: 22px;
+            padding: 14px 16px;
+            background: #fafafa;
+            border-radius: 10px;
+            font-size: 12px;
+            color: #777;
+            line-height: 1.7;
+            text-align: left;
+        }
+        .tips strong { color: #c41e3a; }
+
+        /* 加载动画 */
+        .loading { display: none; text-align: center; padding: 30px 0; }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid #f0e0e0;
+            border-top-color: #c41e3a;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-size: 14px; color: #888; }
+
+        /* 错误 */
+        .error-msg {
+            display: none;
+            color: #c41e3a;
+            font-size: 14px;
+            margin-bottom: 16px;
+            padding: 10px;
+            background: #fef0f0;
+            border-radius: 8px;
+        }
+
+        /* 复制成功提示 */
+        .toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            padding: 14px 28px;
+            border-radius: 10px;
+            font-size: 15px;
+            z-index: 9999;
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        /* 状态切换 */
+        .state-loading #codeDisplay,
+        .state-loading #errorArea { display: none !important; }
+        .state-loading .loading { display: block !important; }
+
+        .state-error #codeDisplay { display: none !important; }
+        .state-error .error-msg { display: block !important; }
+
+        .state-success .loading { display: none !important; }
+
+        @media (max-width: 480px) {
+            .card { padding: 28px 20px; }
+            .code-value { font-size: 22px; letter-spacing: 2px; }
+            .btn { padding: 12px 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="card" id="appCard">
+        <!-- 初始状态：加载中 -->
+        <div class="loading">
+            <div class="spinner"></div>
+            <p class="loading-text">正在为您分配专属注册码...</p>
+        </div>
+
+        <!-- 成功状态 -->
+        <div id="codeDisplay">
+            <div class="icon">🎫</div>
+            <h1>您的专属注册码</h1>
+            <p class="subtitle">每个注册码仅限使用一次，请妥善保存</p>
+
+            <div class="code-box">
+                <div class="code-label">LICENSE CODE</div>
+                <div class="code-value" id="codeValue">--------</div>
+            </div>
+
+            <button class="btn btn-copy" id="copyBtn" onclick="copyCode()">
+                📋 一键复制注册码
+            </button>
+            
+            <a class="btn btn-link" href="javascript:void(0)" onclick="goToTool()">
+                🚀 前往天翼云报价工具 →
+            </a>
+
+            <div class="tips">
+                <strong>📌 使用方法：</strong><br>
+                ① 打开天翼云报价工具<br>
+                ② 添加产品后点击「导出Excel」<br>
+                ③ 粘贴上方注册码即可下载
+            </div>
+        </div>
+
+        <!-- 错误状态 -->
+        <div class="error-msg" id="errorArea"></div>
+    </div>
+
+    <!-- Toast提示 -->
+    <div class="toast" id="toast">已复制到剪贴板</div>
+
+    <script>
+        const ENV_ID = 'ctyunprice-1gskqexee5ae249e';
+        const card = document.getElementById('appCard');
+
+        // 轻量级HTTP方式调用CloudBase云函数（无需SDK）
+        async function callCloudFunction(name, data) {
+            let ticket = null;
+            try {
+                const authRes = await fetch(`https://${ENV_ID}.tcloudbaseapp.com/tcb/auth?env=${ENV_ID}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'anonymousLogin' })
+                });
+                const authData = await authRes.json();
+                if (authData.data && authData.data.ticket) ticket = authData.data.ticket;
+            } catch(e) {}
+
+            const body = { action: data.action || '' };
+            if (ticket) body.ticket = ticket;
+
+            const res = await fetch(
+                `https://${ENV_ID}.tcloudbaseapp.com/tcb/invokefunction?name=${name}&env=${ENV_ID}&ticket=${ticket || ''}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(body)
+                }
+            );
+            const result = await res.json();
+            
+            if (result.code === 0 && result.response_data) return JSON.parse(result.response_data);
+            if (result.result) return result.result;
+            if (result.success !== undefined) return result;
+            throw new Error(result.message || '云函数调用失败');
+        }
+
+        window.onload = async function() {
+            try {
+                await fetchCode();
+            } catch(e) {
+                console.warn('Init failed:', e);
+                showCode(generateLocalCode().code);
+                card.className = 'card state-success';
+            }
+        };
+
+        async function fetchCode() {
+            card.className = 'card state-loading';
+
+            try {
+                const result = await callCloudFunction('getCode', { action: 'allocate' });
+
+                if (result && result.success) {
+                    showCode(result.code || result.data?.code);
+                    card.className = 'card state-success';
+                } else {
+                    throw new Error(result?.message || '获取失败');
+                }
+            } catch(err) {
+                document.getElementById('errorArea').textContent = 
+                    err.message || '网络错误，请稍后重试';
+                card.className = 'card state-error';
+            }
+        }
+
+        // 本地模拟生成（备用模式）
+        function generateLocalCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+            return { success: true, code: 'CTYUN' + code };
+        }
+
+        function showCode(code) {
+            document.getElementById('codeValue').textContent = code;
+        }
+
+        function copyCode() {
+            const code = document.getElementById('codeValue').textContent;
+            if (!code || code.includes('-')) return;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(() => showToast('✅ 已复制！')).catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
+
+            function fallbackCopy() {
+                const ta = document.createElement('textarea');
+                ta.value = code;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); showToast('✅ 已复制！'); }
+                catch(e) { showToast('复制失败，请手动选择'); }
+                document.body.removeChild(ta);
+            }
+        }
+
+        function goToTool() {
+            window.location.href = 'index.html';
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 1800);
+        }
+    </script>
+</body>
+</html>

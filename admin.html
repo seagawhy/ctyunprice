@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>价格管理后台 - 天翼云报价工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #333; }
+        .header { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white; padding: 20px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; overflow: hidden; }
+        .card-header { padding: 16px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .card-header h2 { font-size: 18px; color: #1a73e8; }
+        .card-body { padding: 20px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-item { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; text-align: center; }
+        .stat-item.warning { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .stat-item.success { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .stat-item.info { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .stat-number { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+        .stat-label { font-size: 14px; opacity: 0.9; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.3s; }
+        .btn-primary { background: #1a73e8; color: white; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .filters { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 12px; color: #666; font-weight: 500; }
+        .filter-group select, .filter-group input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; min-width: 150px; }
+        .table-wrapper { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; color: #555; font-size: 13px; }
+        tr:hover { background: #f8f9fa; }
+        .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .badge-compute { background: #ddebf7; color: #2e75b6; }
+        .badge-storage { background: #fce4d6; color: #c65911; }
+        .badge-network { background: #e2efda; color: #548235; }
+        .badge-security { background: #fff2cc; color: #806000; }
+        .badge-gpu { background: #fbe5d6; color: #c55a11; }
+        .change-indicator { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .change-none { background: #e2e3e5; color: #383d41; }
+        .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid #f3f3f3; border-top: 3px solid #1a73e8; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; }
+        .tab { padding: 12px 24px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; font-weight: 500; color: #666; }
+        .tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+        .tab:hover { color: #1a73e8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .log-item { padding: 12px 15px; border-left: 3px solid #1a73e8; background: #f8f9fa; margin-bottom: 10px; border-radius: 0 8px 8px 0; }
+        .log-time { font-size: 12px; color: #999; margin-bottom: 5px; }
+        .log-content { font-size: 14px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; border-radius: 12px; padding: 30px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { font-size: 18px; color: #1a73e8; }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #999; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #999; }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; background: #333; color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 2000; animation: slideIn 0.3s ease; }
+        .toast.success { background: #28a745; }
+        .toast.error { background: #dc3545; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .nav-links { display: flex; gap: 20px; margin-top: 15px; }
+        .nav-links a { color: white; opacity: 0.8; text-decoration: none; font-size: 14px; }
+        .nav-links a:hover { opacity: 1; }
+        .mode-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-left: 10px; }
+        .mode-local { background: #fff3cd; color: #856404; }
+        .mode-cloud { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>价格管理后台 <span id="modeBadge" class="mode-badge mode-local">本地模式</span></h1>
+        <p>天翼云标准产品价格管理与监控</p>
+        <div class="nav-links">
+            <a href="index.html">← 返回报价工具</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="stats">
+            <div class="stat-item"><div class="stat-number" id="totalProducts">0</div><div class="stat-label">产品总数</div></div>
+            <div class="stat-item warning"><div class="stat-number" id="lastChecked">--</div><div class="stat-label">最后检查</div></div>
+            <div class="stat-item success"><div class="stat-number" id="changeCount">0</div><div class="stat-label">待处理变更</div></div>
+            <div class="stat-item info"><div class="stat-number" id="totalLogs">0</div><div class="stat-label">检查日志</div></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2>价格检查</h2>
+                <div>
+                    <button class="btn btn-primary" id="checkNowBtn" onclick="checkPrices()">立即检查天翼云价格</button>
+                    <button class="btn btn-success" id="syncBtn" onclick="syncData()" style="display:none;">同步到云端</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <p style="color: #666; margin-bottom: 15px;" id="modeDesc">
+                    本地模式：直接读取本地价格数据。如需云数据库同步，请在线上环境使用。
+                </p>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('products')">产品列表</div>
+            <div class="tab" onclick="switchTab('logs')">检查日志</div>
+        </div>
+
+        <div class="tab-content active" id="productsTab">
+            <div class="card">
+                <div class="card-header">
+                    <h2>产品列表</h2>
+                    <div class="filters">
+                        <div class="filter-group">
+                            <label>产品分类</label>
+                            <select id="categoryFilter" onchange="filterProducts()">
+                                <option value="">全部分类</option>
+                                <option value="compute">计算资源</option>
+                                <option value="storage">存储资源</option>
+                                <option value="network">网络资源</option>
+                                <option value="security">安全产品</option>
+                                <option value="gpu">GPU云主机</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>搜索</label>
+                            <input type="text" id="searchInput" placeholder="输入产品名称..." oninput="filterProducts()">
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>分类</th>
+                                    <th>产品名称</th>
+                                    <th>规格</th>
+                                    <th>月租价</th>
+                                    <th>年租价</th>
+                                    <th>三年价</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productTableBody">
+                                <tr><td colspan="6" style="text-align:center;padding:40px;"><div class="spinner"></div>加载中...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="logsTab">
+            <div class="card">
+                <div class="card-header"><h2>检查日志</h2></div>
+                <div class="card-body">
+                    <div id="logsList"><div class="empty-state"><p>暂无检查日志</p></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 本地价格数据 -->
+    <script src="js/price-data.js"></script>
+    <script src="js/gpu-data.js"></script>
+
+    <!-- CloudBase Web SDK (腾讯云官方CDN) -->
+    <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js"
+            onerror="window.__sdkLoadError='CloudBase SDK 加载失败(官方CDN): ' + this.src"></script>
+
+    <script>
+        // ===== 全局状态 =====
+        var isCloudMode = false;
+        var app = null;
+        var db = null;
+        var products = [];
+        var logs = [];
+
+        // ===== 本地价格数据解析 =====
+        function getLocalProducts() {
+            var items = [];
+            // PRICE_DATA 来自 js/price-data.js
+            if (typeof PRICE_DATA === 'undefined') return items;
+
+            for (var catId in PRICE_DATA) {
+                var cat = PRICE_DATA[catId];
+                if (!cat || !cat.products) continue;
+                for (var key in cat.products) {
+                    var p = cat.products[key];
+                    items.push({
+                        _id: catId + '_' + key,
+                        category_id: catId,
+                        product_key: key,
+                        name: p.name || '',
+                        spec: p.spec || '',
+                        monthly_price: p.monthlyPrice || 0,
+                        yearly_price: p.yearlyPrice || 0,
+                        three_year_price: p.threeYearPrice || 0,
+                        unit: p.unit || '月'
+                    });
+                }
+            }
+            return items;
+        }
+
+        // ===== 初始化 =====
+        async function init() {
+            // 检查 SDK 是否加载
+            if (window.__sdkLoadError || typeof cloudbase === 'undefined') {
+                var errMsg = window.__sdkLoadError || 'CloudBase SDK 未加载';
+                console.error(errMsg);
+                isCloudMode = false;
+                products = getLocalProducts();
+                document.getElementById('modeBadge').className = 'mode-badge mode-local';
+                document.getElementById('modeBadge').textContent = '本地模式';
+                document.getElementById('modeDesc').textContent = '本地模式：' + errMsg;
+                await loadData();
+                updateStats();
+                return;
+            }
+
+            // 始终尝试连接 CloudBase，失败才降级为纯本地
+            try {
+                app = cloudbase.init({ env: 'ctyunprice-1gskqexee5ae249e' });
+                
+                // 尝试匿名登录
+                var auth = app.auth();
+                var loginState = await auth.getLoginState();
+                if (!loginState) {
+                    try {
+                        await auth.anonymousAuthProvider().signIn();
+                        console.log('匿名登录成功');
+                    } catch (anonErr) {
+                        console.warn('匿名登录失败:', anonErr.message || anonErr);
+                    }
+                }
+                
+                db = app.database();
+                isCloudMode = true;
+                document.getElementById('modeBadge').className = 'mode-badge mode-cloud';
+                document.getElementById('modeBadge').textContent = '云端模式';
+                document.getElementById('modeDesc').textContent = '云端模式：数据存储在云数据库，支持价格检查和同步。';
+                document.getElementById('syncBtn').style.display = 'inline-block';
+                console.log('CloudBase 连接成功, isCloudMode=' + isCloudMode);
+            } catch (e) {
+                console.error('CloudBase 连接失败:', e.message || e);
+                isCloudMode = false;
+                products = getLocalProducts();
+                document.getElementById('modeBadge').className = 'mode-badge mode-local';
+                document.getElementById('modeBadge').textContent = '本地模式';
+                document.getElementById('modeDesc').textContent = '本地模式：无法连接云数据库（' + (e.message || '未知错误') + '）';
+            }
+
+            await loadData();
+            updateStats();
+        }
+
+        // ===== 数据加载 =====
+        async function loadData() {
+            // 始终以本地数据为基础（确保完整161个产品）
+            products = getLocalProducts();
+
+            if (isCloudMode && db) {
+                try {
+                    var res = await db.collection('price_products').limit(1000).get();
+                    var cloudProducts = res.data || [];
+
+                    // 用云端数据覆盖本地对应产品的价格（合并策略）
+                    var cloudMap = {};
+                    cloudProducts.forEach(function(cp) { cloudMap[cp.product_key] = cp; });
+
+                    products = products.map(function(p) {
+                        var cloudP = cloudMap[p.product_key];
+                        if (cloudP && (cloudP.price_source === 'fetched' || cloudP.hasChange)) {
+                            // 有云端检查记录，用云端价格覆盖
+                            p.monthly_price = cloudP.monthly_price;
+                            p.yearly_price = cloudP.yearly_price;
+                            p.three_year_price = cloudP.three_year_price;
+                            p.hasChange = cloudP.hasChange;
+                            p.last_checked = cloudP.last_checked;
+                            p.price_fetched_at = cloudP.price_fetched_at;
+                            p.price_source = cloudP.price_source;
+                            p.remark = cloudP.remark;
+                        }
+                        return p;
+                    });
+
+                    console.log('数据合并完成: 本地' + products.length + '个, 云端覆盖' + cloudProducts.length + '条');
+                } catch (e) {
+                    console.error('加载云端产品失败:', e);
+                }
+                try {
+                    var logRes = await db.collection('price_check_logs').orderBy('createTime', 'desc').limit(50).get();
+                    logs = logRes.data || [];
+                } catch (e) {
+                    console.error('加载日志失败:', e);
+                }
+            }
+            renderProductTable();
+            renderLogs();
+        }
+
+        // ===== 统计更新 =====
+        function updateStats() {
+            document.getElementById('totalProducts').textContent = products.length;
+            var lastLog = logs.find(function(l) { return l.status === 'success'; });
+            document.getElementById('lastChecked').textContent = lastLog ? formatTime(lastLog.createTime) : '--';
+            document.getElementById('changeCount').textContent = products.filter(function(p) { return p.hasChange; }).length;
+            document.getElementById('totalLogs').textContent = logs.length;
+        }
+
+        // ===== 产品表格渲染 =====
+        function renderProductTable() {
+            var tbody = document.getElementById('productTableBody');
+            var catFilter = document.getElementById('categoryFilter').value;
+            var search = document.getElementById('searchInput').value.toLowerCase();
+
+            var filtered = products.filter(function(p) {
+                if (catFilter && p.category_id !== catFilter) return false;
+                if (search && !(p.name || '').toLowerCase().includes(search) && !(p.spec || '').toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无数据</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(function(p) {
+                return '<tr>' +
+                    '<td><span class="badge badge-' + p.category_id + '">' + getCategoryName(p.category_id) + '</span></td>' +
+                    '<td>' + (p.name || '-') + '</td>' +
+                    '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + (p.spec || '-') + '</td>' +
+                    '<td>' + formatPrice(p.monthly_price) + '</td>' +
+                    '<td>' + formatPrice(p.yearly_price) + '</td>' +
+                    '<td>' + formatPrice(p.three_year_price) + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function formatPrice(v) {
+            if (v === null || v === undefined) return '-';
+            return '¥' + Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        }
+
+        function getCategoryName(id) {
+            var names = { compute: '计算', storage: '存储', network: '网络', security: '安全', gpu: 'GPU' };
+            return names[id] || id;
+        }
+
+        function filterProducts() { renderProductTable(); }
+
+        // ===== 日志渲染 =====
+        function renderLogs() {
+            var list = document.getElementById('logsList');
+            if (logs.length === 0) {
+                list.innerHTML = '<div class="empty-state"><p>暂无日志</p></div>';
+                return;
+            }
+            list.innerHTML = logs.map(function(log) {
+                var icon = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' }[log.status] || 'ℹ️';
+                return '<div class="log-item">' +
+                    '<div class="log-time">' + formatTime(log.createTime) + '</div>' +
+                    '<div class="log-content"><strong>' + icon + ' ' + (log.title || '') + '</strong>' +
+                    '<p style="margin-top:5px;color:#666;">' + (log.message || '') + '</p></div></div>';
+            }).join('');
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '-';
+            var d = ts instanceof Date ? ts : new Date(ts);
+            return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+
+        // ===== 检查价格 =====
+        async function checkPrices() {
+            var btn = document.getElementById('checkNowBtn');
+            btn.disabled = true;
+            btn.textContent = '检查中...';
+
+            try {
+                if (isCloudMode && app) {
+                    // 云端模式：调用云函数
+                    var callResult = await app.callFunction({
+                        name: 'fetchRealPrices',
+                        data: {}
+                    });
+                    
+                    console.log('云函数返回:', JSON.stringify(callResult));
+                    
+                    var result = callResult.result;
+                    // result 可能是字符串，需要解析
+                    if (typeof result === 'string') {
+                        try { result = JSON.parse(result); } catch(e) {}
+                    }
+                    
+                    if (result && result.success) {
+                        showToast(result.message || '检查完成', 'success');
+                    } else {
+                        showToast('检查失败: ' + ((result && result.message) || '未知错误'), 'error');
+                    }
+                    await loadData();
+                    updateStats();
+                } else {
+                    // 本地模式：模拟检查
+                    await new Promise(function(r) { setTimeout(r, 1500); });
+                    logs.unshift({
+                        status: 'info',
+                        title: '本地模式检查',
+                        message: '本地模式暂不支持自动检查，请在线上环境使用云端模式。当前产品共 ' + products.length + ' 个。',
+                        createTime: new Date()
+                    });
+                    renderLogs();
+                    updateStats();
+                    showToast('本地模式：请在线上环境使用价格检查功能', 'info');
+                }
+            } catch (e) {
+                console.error('检查失败:', e);
+                showToast('检查失败: ' + (e.message || '网络错误'), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '立即检查天翼云价格';
+            }
+        }
+
+        // ===== 同步数据 =====
+        async function syncData() {
+            if (!isCloudMode || !app) {
+                showToast('仅云端模式支持同步', 'error');
+                return;
+            }
+            try {
+                var res = await app.callFunction({ name: 'syncPriceData', data: { source: 'all' } });
+                if (res.result && res.result.success) {
+                    showToast('同步成功！共 ' + res.result.count + ' 条记录', 'success');
+                    await loadData();
+                    updateStats();
+                } else {
+                    showToast('同步失败', 'error');
+                }
+            } catch (e) {
+                showToast('同步失败: ' + (e.message || '网络错误'), 'error');
+            }
+        }
+
+        // ===== Tab 切换 =====
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+            document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+            event.target.classList.add('active');
+            document.getElementById(name + 'Tab').classList.add('active');
+        }
+
+        // ===== Toast =====
+        function showToast(msg, type) {
+            var t = document.createElement('div');
+            t.className = 'toast ' + (type || '');
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(function() { t.remove(); }, 3000);
+        }
+
+        // ===== 启动 =====
+        init();
+    </script>
+</body>
+</html>
