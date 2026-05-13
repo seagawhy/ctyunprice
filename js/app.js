@@ -3858,13 +3858,18 @@ class CloudQuoteApp {
             <div style="font-size:48px;margin-bottom:16px;">📋</div>
             <h3 style="margin:0 0 12px;color:#1a73e8;font-size:18px;">欢迎使用天翼云报价工具</h3>
             <p style="color:#666;line-height:1.6;margin:0 0 20px;font-size:14px;">
-                您的授权已验证成功！<br>请先在左侧选择产品添加到报价单，<br>然后点击下方按钮生成报价单文件。
+                请先在左侧选择产品添加到报价单，<br>然后点击下方按钮生成报价单文件。
             </p>
-            <button id="guideCloseBtn" style="background:#1a73e8;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-size:15px;cursor:pointer;margin-bottom:8px;">
+            <div style="text-align:center;padding:12px;background:#fafafa;border-radius:10px;border:2px dashed #e0ddd5;margin-bottom:16px;">
+                <img src="${LICENSE_CONFIG.qrCodeUrl}" alt="公众号二维码" style="width:160px;height:160px;object-fit:contain;border-radius:8px;background:#f5f5f5;">
+                <p style="font-size:11px;color:#999;margin-top:8px;margin-bottom:0;">扫码关注公众号，获取更多优惠资讯</p>
+            </div>
+            <button id="guideCloseBtn" style="background:#1a73e8;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-size:15px;cursor:pointer;">
                 知道了，去选产品
             </button>
-            <br>
-            <span style="color:#999;font-size:12px;">添加产品后，点击「导出Excel报价单」即可下载</span>
+            <div style="margin-top:10px;">
+                <span style="color:#999;font-size:12px;">添加产品后，点击「导出Excel报价单」即可下载</span>
+            </div>
         `;
 
         overlay.appendChild(dialog);
