@@ -11,19 +11,52 @@ const LICENSE_CONFIG = {
 
 class CloudQuoteApp {
     constructor() {
-        this.quoteList = [];
-        this.currentCategory = 'compute';
-        this.projectName = '';
-        this.date = new Date().toLocaleDateString('zh-CN');
-        
+        // 从localStorage恢复状态（首次访问为空则使用默认值）
+        const savedState = this.loadState();
+        this.quoteList = savedState.quoteList || [];
+        this.currentCategory = savedState.currentCategory || 'compute';
+        this.projectName = savedState.projectName || '';
+        this.date = savedState.date || new Date().toLocaleDateString('zh-CN');
+
         this.init();
+    }
+
+    // 持久化状态到localStorage
+    saveState() {
+        try {
+            localStorage.setItem('ctyun_quote_state', JSON.stringify({
+                quoteList: this.quoteList,
+                currentCategory: this.currentCategory,
+                projectName: this.projectName,
+                date: this.date
+            }));
+        } catch(e) { /* 忽略存储异常 */ }
+    }
+
+    // 从localStorage恢复状态
+    loadState() {
+        try {
+            const data = localStorage.getItem('ctyun_quote_state');
+            return data ? JSON.parse(data) : {};
+        } catch(e) { return {}; }
     }
     
     init() {
         this.renderCategories();
+        // 恢复之前选中的分类
+        if (this.quoteList.length > 0) {
+            const catBtn = document.querySelector(`[data-category="${this.currentCategory}"]`);
+            if (catBtn) {
+                catBtn.click();
+            }
+        }
         this.renderProducts();
         this.renderQuoteList();
         this.bindEvents();
+        // 恢复项目名称
+        if (this.projectName) {
+            document.getElementById('projectName').value = this.projectName;
+        }
         this.updateDate();
     }
     
@@ -35,6 +68,7 @@ class CloudQuoteApp {
         // 项目名称
         document.getElementById('projectName').addEventListener('input', (e) => {
             this.projectName = e.target.value;
+            this.saveState();
         });
         
         // 清空报价单
@@ -3600,6 +3634,7 @@ class CloudQuoteApp {
         this.quoteList.push(item);
         this.renderQuoteList();
         this.updateCategoryCounts();
+        this.saveState();
     }
     
     updateCategoryCounts() {
@@ -3767,6 +3802,7 @@ class CloudQuoteApp {
         this.quoteList = this.quoteList.filter(item => item.id !== id);
         this.renderQuoteList();
         this.updateCategoryCounts();
+        this.saveState();
     }
     
     clearQuote() {
@@ -3776,24 +3812,74 @@ class CloudQuoteApp {
             this.quoteList = [];
             this.renderQuoteList();
             this.updateCategoryCounts();
+            this.saveState();
         }
     }
     
     async exportExcel() {
         if (this.quoteList.length === 0) {
-            alert('请先添加产品到报价单');
+            // 有 download 参数时，说明用户刚验证完注册码，提供友好引导而非简单alert
+            if (window.location.search.includes('download=1') || this._pendingDownload) {
+                this.showDownloadGuide();
+            } else {
+                alert('请先添加产品到报价单');
+            }
             return;
         }
 
         // 注册码验证
         const licensed = await this.checkLicense();
         if (!licensed) {
-            // 跳转到独立验证页面（100%可靠，不依赖任何CSS/弹窗）
+            // 先保存当前已选产品到localStorage，授权返回后可恢复
+            this.saveState();
             window.location.href = 'verify.html';
             return;
         }
         
         this.doExportExcel();
+    }
+
+    // 显示下载引导弹窗：提示用户先添加产品，添加后可直接下载
+    showDownloadGuide() {
+        this._pendingDownload = true; // 标记有待下载请求
+
+        // 创建引导弹窗
+        let overlay = document.getElementById('downloadGuideOverlay');
+        if (overlay) overlay.remove();
+
+        overlay = document.createElement('div');
+        overlay.id = 'downloadGuideOverlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background:#fff;border-radius:12px;padding:32px;max-width:420px;width:90%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);';
+
+        dialog.innerHTML = `
+            <div style="font-size:48px;margin-bottom:16px;">📋</div>
+            <h3 style="margin:0 0 12px;color:#1a73e8;font-size:18px;">欢迎使用天翼云报价工具</h3>
+            <p style="color:#666;line-height:1.6;margin:0 0 20px;font-size:14px;">
+                您的授权已验证成功！<br>请先在左侧选择产品添加到报价单，<br>然后点击下方按钮生成报价单文件。
+            </p>
+            <button id="guideCloseBtn" style="background:#1a73e8;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-size:15px;cursor:pointer;margin-bottom:8px;">
+                知道了，去选产品
+            </button>
+            <br>
+            <span style="color:#999;font-size:12px;">添加产品后，点击「导出Excel报价单」即可下载</span>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        const close = () => {
+            overlay.remove();
+            // 清除URL参数
+            if (window.location.search.includes('download=1')) {
+                history.replaceState(null, '', window.location.pathname);
+            }
+        };
+
+        document.getElementById('guideCloseBtn').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     }
 
     // 每次导出都通过云端验证注册码（不依赖本地缓存）
@@ -4182,6 +4268,7 @@ class CloudQuoteApp {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        this._pendingDownload = false; // 清除待下载标记
     }
 }
 
@@ -4206,10 +4293,10 @@ function getProductDetail(categoryId, productKey) {
 let app;
 document.addEventListener('DOMContentLoaded', () => {
     app = new CloudQuoteApp();
-    // 从验证页返回时自动下载
+    // 从验证页返回时自动下载（走 exportExcel 正规路径，包含空列表检查+license验证）
     if (window.location.search.includes('download=1')) {
-        setTimeout(() => app.doExportExcel(), 500);
-        // 清除URL参数
+        app._pendingDownload = true; // 先标记，再清除URL
         history.replaceState(null, '', window.location.pathname);
+        setTimeout(() => app.exportExcel(), 1000);
     }
 });
